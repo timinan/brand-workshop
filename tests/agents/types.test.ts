@@ -68,6 +68,40 @@ describe("agent schemas", () => {
     expect(fail.success).toBe(false);
   });
 
+  it("DesignerOutputSchema accepts exactly 3 concepts", () => {
+    const ok = DesignerOutputSchema.safeParse({
+      concepts: [
+        { imageUrl: "https://x/a.png", description: "first concept", styleTags: ["mark"] },
+        { imageUrl: "https://x/b.png", description: "second concept", styleTags: ["wordmark"] },
+        { imageUrl: "https://x/c.png", description: "third concept", styleTags: ["abstract"] },
+      ],
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it("StrategistOutputSchema accepts valid output with 2 competitors", () => {
+    const ok = StrategistOutputSchema.safeParse({
+      positioning: "The PM tool built for speed and clarity",
+      competitors: [
+        { name: "Notion", url: "https://notion.so", differentiator: "docs-first" },
+        { name: "Linear", url: "https://linear.app", differentiator: "eng-focused" },
+      ],
+      differentiation: "AI-native workflow with zero setup",
+      risk: "Large incumbents with distribution advantages",
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it("BrandScoutOutputSchema rejects invalid recommendation", () => {
+    const fail = BrandScoutOutputSchema.safeParse({
+      scorecard: { existingCompany: "pass", domain: "pass", trademark: "pass", connotations: "pass" },
+      findings: [],
+      recommendation: "totally_invalid",
+      vettedName: "Pebble",
+    });
+    expect(fail.success).toBe(false);
+  });
+
   it("BrandKitSchema composes all agent outputs", () => {
     const ok = BrandKitSchema.safeParse({
       brief: "an AI tool for PMs",

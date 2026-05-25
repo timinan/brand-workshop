@@ -86,16 +86,16 @@ export const StrategistOutputSchema = z.object({
 export type StrategistOutput = z.infer<typeof StrategistOutputSchema>;
 
 export const NameConsideredSchema = z.object({
-  name: z.string(),
-  reasoning: z.string(),
+  name: z.string().min(1),
+  reasoning: z.string().min(1),
   rejected: z.boolean(),
   reason: z.string().nullable(),
 });
 
 export const AutoSwapInfoSchema = z.object({
-  from: z.string(),
-  to: z.string(),
-  reason: z.string(),
+  from: z.string().min(1),
+  to: z.string().min(1),
+  reason: z.string().min(1),
 });
 
 export const BrandKitSchema = z.object({
