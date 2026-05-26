@@ -5,6 +5,7 @@ import type { AgentName, BrandKit } from "@/lib/agents/types";
 import BriefInput from "./BriefInput";
 import PresetChips from "./PresetChips";
 import AgentPane from "./AgentPane";
+import AutoSwapBanner from "./AutoSwapBanner";
 
 export type PaneState = "waiting" | "running" | "tool-use" | "done" | "error";
 
@@ -100,11 +101,7 @@ export default function Workshop() {
       <BriefInput brief={brief} onChange={setBrief} onGenerate={start} disabled={running} />
       <PresetChips onPick={(_id, b) => { setBrief(b); }} disabled={running} />
 
-      {autoSwap && (
-        <div className="rounded border border-amber-400 bg-amber-50 p-3 text-sm">
-          Swapped <strong>{autoSwap.from}</strong> → <strong>{autoSwap.to}</strong> — {autoSwap.reason}
-        </div>
-      )}
+      {autoSwap && <AutoSwapBanner from={autoSwap.from} to={autoSwap.to} reason={autoSwap.reason} />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-4">
