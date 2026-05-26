@@ -6,9 +6,9 @@ import type { BrandKit as BrandKitData } from "@/lib/agents/types";
 const VERDICT_COLOR = { pass: "bg-emerald-100 text-emerald-800", warn: "bg-amber-100 text-amber-800", fail: "bg-red-100 text-red-800" } as const;
 const VERDICT_LABEL = { pass: "Pass", warn: "Warn", fail: "Fail" } as const;
 
-interface Props { kit: BrandKitData }
+interface Props { kit: BrandKitData; onReset: () => void }
 
-export default function BrandKit({ kit }: Props) {
+export default function BrandKit({ kit, onReset }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   async function downloadPng() {
@@ -119,6 +119,7 @@ export default function BrandKit({ kit }: Props) {
       <div className="flex gap-2">
         <button onClick={downloadPng} className="rounded border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100">Download PNG</button>
         <button onClick={copySummary} className="rounded border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100">Copy summary</button>
+        <button onClick={onReset} className="rounded border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100">Start over</button>
       </div>
     </section>
   );

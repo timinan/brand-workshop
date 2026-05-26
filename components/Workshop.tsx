@@ -126,7 +126,7 @@ export default function Workshop() {
         </div>
       </div>
 
-      {brandKit && <BrandKit kit={brandKit} />}
+      {brandKit && <BrandKit kit={brandKit} onReset={reset} />}
     </div>
   );
 }
