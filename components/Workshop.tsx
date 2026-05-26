@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
 import type { WorkshopEvent } from "@/lib/events/types";
-import type { AgentName, BrandKit } from "@/lib/agents/types";
+import type { AgentName, BrandKit as BrandKitData } from "@/lib/agents/types";
 import BriefInput from "./BriefInput";
 import PresetChips from "./PresetChips";
 import AgentPane from "./AgentPane";
 import AutoSwapBanner from "./AutoSwapBanner";
+import BrandKit from "./BrandKit";
 
 export type PaneState = "waiting" | "running" | "tool-use" | "done" | "error";
 
@@ -30,7 +31,7 @@ export default function Workshop() {
   const [brief, setBrief] = useState("");
   const [running, setRunning] = useState(false);
   const [agents, setAgents] = useState<Record<AgentName, AgentRuntimeState>>(INITIAL);
-  const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
+  const [brandKit, setBrandKit] = useState<BrandKitData | null>(null);
   const [autoSwap, setAutoSwap] = useState<{ from: string; to: string; reason: string } | null>(null);
 
   function reset() {
@@ -115,9 +116,7 @@ export default function Workshop() {
         </div>
       </div>
 
-      {brandKit && (
-        <pre data-testid="brand-kit" className="rounded border p-4 text-xs">{JSON.stringify(brandKit, null, 2)}</pre>
-      )}
+      {brandKit && <BrandKit kit={brandKit} />}
     </div>
   );
 }
