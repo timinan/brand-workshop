@@ -2,6 +2,8 @@
 import { useState } from "react";
 import type { WorkshopEvent } from "@/lib/events/types";
 import type { AgentName, BrandKit } from "@/lib/agents/types";
+import BriefInput from "./BriefInput";
+import PresetChips from "./PresetChips";
 
 export type PaneState = "waiting" | "running" | "tool-use" | "done" | "error";
 
@@ -94,22 +96,8 @@ export default function Workshop() {
 
   return (
     <div className="space-y-8">
-      <div className="flex gap-2">
-        <input
-          className="flex-1 rounded border border-neutral-300 px-3 py-2"
-          placeholder="One sentence: an AI tool for product managers"
-          value={brief}
-          onChange={(e) => setBrief(e.target.value)}
-          disabled={running}
-        />
-        <button
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
-          onClick={start}
-          disabled={running || brief.length < 4}
-        >
-          {running ? "Working..." : "Generate"}
-        </button>
-      </div>
+      <BriefInput brief={brief} onChange={setBrief} onGenerate={start} disabled={running} />
+      <PresetChips onPick={(_id, b) => { setBrief(b); }} disabled={running} />
 
       {autoSwap && (
         <div className="rounded border border-amber-400 bg-amber-50 p-3 text-sm">
