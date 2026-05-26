@@ -100,7 +100,17 @@ export default function Workshop() {
   return (
     <div className="space-y-8">
       <BriefInput brief={brief} onChange={setBrief} onGenerate={start} disabled={running} />
-      <PresetChips onPick={(_id, b) => { setBrief(b); }} disabled={running} />
+      <PresetChips
+          onPick={(_id, b, cached) => {
+            setBrief(b);
+            if (cached) {
+              reset();
+              setBrandKit(cached);
+              if (cached.autoSwapped) setAutoSwap(cached.autoSwapped);
+            }
+          }}
+          disabled={running}
+        />
 
       {autoSwap && <AutoSwapBanner from={autoSwap.from} to={autoSwap.to} reason={autoSwap.reason} />}
 
