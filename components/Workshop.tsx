@@ -4,6 +4,7 @@ import type { WorkshopEvent } from "@/lib/events/types";
 import type { AgentName, BrandKit } from "@/lib/agents/types";
 import BriefInput from "./BriefInput";
 import PresetChips from "./PresetChips";
+import AgentPane from "./AgentPane";
 
 export type PaneState = "waiting" | "running" | "tool-use" | "done" | "error";
 
@@ -107,13 +108,13 @@ export default function Workshop() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-4">
-          <pre data-testid="namer-pane" className="rounded border p-3">{`Namer · ${agents.namer.state}`}</pre>
-          <pre data-testid="brand-scout-pane" className="rounded border p-3">{`Brand Scout · ${agents["brand-scout"].state}`}</pre>
+          <AgentPane agent="namer" runtime={agents.namer} />
+          <AgentPane agent="brand-scout" runtime={agents["brand-scout"]} />
         </div>
         <div className="space-y-4">
-          <pre data-testid="designer-pane" className="rounded border p-3">{`Designer · ${agents.designer.state}`}</pre>
-          <pre data-testid="copywriter-pane" className="rounded border p-3">{`Copywriter · ${agents.copywriter.state}`}</pre>
-          <pre data-testid="strategist-pane" className="rounded border p-3">{`Strategist · ${agents.strategist.state}`}</pre>
+          <AgentPane agent="designer" runtime={agents.designer} />
+          <AgentPane agent="copywriter" runtime={agents.copywriter} />
+          <AgentPane agent="strategist" runtime={agents.strategist} />
         </div>
       </div>
 
