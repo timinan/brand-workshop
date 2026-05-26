@@ -1,9 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import type { FunctionDeclarationsTool } from "@google/generative-ai";
 import type { LLMProvider, LLMStreamOptions, LLMChunk, ToolDefinition } from "../types";
 
-// Use string literals matching SchemaType enum values so the mock doesn't
-// need to export SchemaType. The Gemini SDK accepts both.
 function toGeminiTools(tools?: ToolDefinition[]): FunctionDeclarationsTool[] | undefined {
   if (!tools || tools.length === 0) return undefined;
   return [
@@ -12,8 +10,8 @@ function toGeminiTools(tools?: ToolDefinition[]): FunctionDeclarationsTool[] | u
         name: t.name,
         description: t.description,
         parameters: {
-          type: "object" as const,
-          properties: { query: { type: "string" as const, description: "search query" } },
+          type: SchemaType.OBJECT,
+          properties: { query: { type: SchemaType.STRING, description: "search query" } },
           required: ["query"],
         },
       })),

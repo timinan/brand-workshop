@@ -7,8 +7,8 @@ function toAnthropicTools(tools?: ToolDefinition[]) {
     name: t.name,
     description: t.description,
     input_schema: {
-      type: "object",
-      properties: { query: { type: "string", description: "search query" } },
+      type: "object" as const,
+      properties: { query: { type: "string" as const, description: "search query" } },
       required: ["query"],
     },
   }));

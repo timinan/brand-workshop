@@ -8,6 +8,7 @@ vi.mock("@google/generative-ai", () => ({
       generateContentStream: (req: unknown) => mockStream(req),
     }),
   })),
+  SchemaType: { OBJECT: "object", STRING: "string" },
 }));
 
 describe("GeminiProvider", () => {
