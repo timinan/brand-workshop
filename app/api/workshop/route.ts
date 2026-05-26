@@ -3,10 +3,16 @@ import { getLLMProvider, getSearchProvider, getImageProvider } from "@/lib/provi
 import { runWorkshop } from "@/lib/orchestrator/workshop";
 import { encodeSseEvent } from "@/lib/orchestrator/sse";
 import type { WorkshopEvent } from "@/lib/events/types";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
+  const rl = await checkRateLimit(req);
+  if (!rl.allowed) {
+    return new Response("Rate limit exceeded. Try again later.", { status: 429 });
+  }
+
   const body = (await req.json().catch(() => ({}))) as { brief?: string };
   const brief = (body.brief ?? "").trim();
   if (!brief || brief.length < 4 || brief.length > 280) {
