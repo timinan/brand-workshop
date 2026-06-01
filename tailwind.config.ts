@@ -5,7 +5,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        serif: ["Georgia", "serif"],
+        serif: ["Fraunces", "Georgia", "serif"],
         sans: ["Inter", "system-ui", "sans-serif"],
       },
     },
