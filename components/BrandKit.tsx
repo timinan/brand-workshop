@@ -116,13 +116,13 @@ export default function BrandKit({ kit, onReset }: Props) {
           )}
         </div>
 
-        <div className="animate-slide-up stagger-6">
+        <div className="animate-slide-up stagger-7">
           <h3 className="mb-3 text-[11px] uppercase tracking-[0.14em] text-stone-500">Names considered</h3>
           <ul className="space-y-1 text-sm">
             {kit.namesConsidered.map((n) => (
               <li key={n.name} className={n.rejected ? "text-stone-500 line-through decoration-stone-400" : "text-stone-900"}>
                 <strong>{n.name}</strong> — {n.reasoning}
-                {n.rejected && n.reason && <span className="ml-1 italic no-underline">({n.reason})</span>}
+                {n.rejected && n.reason && <span className="ml-1 italic">({n.reason})</span>}
               </li>
             ))}
           </ul>
