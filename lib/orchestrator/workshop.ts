@@ -10,17 +10,25 @@ import type { BrandScoutOutput, NamerOutput } from "@/lib/agents/types";
 
 export interface WorkshopArgs {
   brief: string;
-  llm: LLMProvider;
-  search: SearchProvider;
-  image: ImageProvider;
+  getLlm: () => LLMProvider;
+  getSearch: () => SearchProvider;
+  getImage: () => ImageProvider;
   emit: (event: WorkshopEvent) => void;
 }
 
 const MAX_SCOUT_ATTEMPTS = 3;
 
 export async function runWorkshop(args: WorkshopArgs): Promise<void> {
-  const { brief, llm, search, image, emit } = args;
+  const { brief, getLlm, getSearch, getImage, emit } = args;
   emit({ type: "workshop_started", brief });
+
+  let llm: LLMProvider;
+  try {
+    llm = getLlm();
+  } catch (err) {
+    emit({ type: "workshop_error", error: errorMessage(err) });
+    return;
+  }
 
   // Stage 1: Namer
   let namer: NamerOutput;
@@ -45,6 +53,7 @@ export async function runWorkshop(args: WorkshopArgs): Promise<void> {
     tried.push(chosenName);
     emit({ type: "agent_started", agent: "brand-scout" });
     try {
+      const search = getSearch();
       const result = await runBrandScout({
         name: chosenName, brief, llm, search,
         onDelta: (delta) => emit({ type: "agent_streaming", agent: "brand-scout", delta }),
@@ -101,6 +110,7 @@ export async function runWorkshop(args: WorkshopArgs): Promise<void> {
   const designerPromise = (async () => {
     emit({ type: "agent_started", agent: "designer" });
     try {
+      const image = getImage();
       const out = await runDesigner({
         name: vettedName, brief, image,
         onImage: (i, url) => emit({ type: "image_generated", conceptIndex: i, url }),
@@ -131,6 +141,7 @@ export async function runWorkshop(args: WorkshopArgs): Promise<void> {
   const strategistPromise = (async () => {
     emit({ type: "agent_started", agent: "strategist" });
     try {
+      const search = getSearch();
       const out = await runStrategist({
         name: vettedName, brief, llm, search,
         onDelta: (delta) => emit({ type: "agent_streaming", agent: "strategist", delta }),

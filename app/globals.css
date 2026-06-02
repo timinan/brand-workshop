@@ -2,20 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { @apply bg-white text-neutral-900; }
+html, body { @apply bg-stone-50 text-stone-950; }
+
+/* Display variants — Tailwind doesn't expose font-variation-settings */
+.font-display {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 0;
+}
+.font-display-italic {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 1;
+}
 
 @layer utilities {
-  .animate-slide-up {
-    animation: slideUp 380ms ease-out;
-  }
-  .animate-slide-in {
-    animation: slideIn 320ms ease-out;
-  }
-  .animate-pulse-subtle {
-    animation: pulseSubtle 1.2s ease-in-out infinite;
+  .animate-slide-up { animation: slideUp 380ms ease-out both; }
+  .animate-slide-in { animation: slideIn 320ms ease-out both; }
+  .animate-pulse-subtle { animation: pulseSubtle 1.6s ease-in-out infinite; }
+
+  /* Stagger utilities — apply alongside .animate-slide-up on brand kit children */
+  .stagger-1 { animation-delay: 40ms; }
+  .stagger-2 { animation-delay: 80ms; }
+  .stagger-3 { animation-delay: 120ms; }
+  .stagger-4 { animation-delay: 160ms; }
+  .stagger-5 { animation-delay: 200ms; }
+  .stagger-6 { animation-delay: 240ms; }
+  .stagger-7 { animation-delay: 280ms; }
+
+  /* Inline spinner used in BriefInput "Working…" state */
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 999px;
+    animation: spin 700ms linear infinite;
   }
 }
 
-@keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes slideIn { from { transform: translateY(-8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes pulseSubtle { 0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } 50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); } }
+@keyframes pulseSubtle {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(194, 65, 12, 0.18); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up, .animate-slide-in, .animate-pulse-subtle, .spinner {
+    animation: none !important;
+  }
+  .animate-slide-up, .animate-slide-in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+  }
+}

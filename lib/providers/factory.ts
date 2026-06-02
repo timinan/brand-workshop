@@ -1,6 +1,7 @@
 import type { LLMProvider, SearchProvider, ImageProvider } from "./types";
 import { GeminiProvider } from "./llm/gemini";
 import { AnthropicProvider } from "./llm/anthropic";
+import { CloudflareLLMProvider } from "./llm/cloudflare";
 import { BraveSearchProvider } from "./search/brave";
 import { AnthropicSearchProvider } from "./search/anthropic";
 import { CloudflareImageProvider } from "./image/cloudflare";
@@ -13,9 +14,16 @@ function required(name: string): string {
 }
 
 export function getLLMProvider(): LLMProvider {
-  const choice = (process.env.LLM_PROVIDER ?? "gemini").toLowerCase();
+  const choice = (process.env.LLM_PROVIDER ?? "cloudflare").toLowerCase();
   if (choice === "anthropic") return new AnthropicProvider({ apiKey: required("ANTHROPIC_API_KEY") });
   if (choice === "gemini") return new GeminiProvider({ apiKey: required("GEMINI_API_KEY") });
+  if (choice === "cloudflare") {
+    return new CloudflareLLMProvider({
+      accountId: required("CLOUDFLARE_ACCOUNT_ID"),
+      apiToken: required("CLOUDFLARE_API_TOKEN"),
+      model: process.env.CLOUDFLARE_LLM_MODEL,
+    });
+  }
   throw new Error(`Unknown LLM_PROVIDER: ${choice}`);
 }
 

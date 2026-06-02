@@ -1,59 +1,69 @@
 import type { AgentName } from "@/lib/agents/types";
 import { AGENT_REGISTRY } from "@/lib/agents/registry";
 import ToolUseChip from "./ToolUseChip";
+import AgentPaneDebug from "./AgentPaneDebug";
 import type { AgentRuntimeState } from "./Workshop";
 
 interface Props {
   agent: AgentName;
   runtime: AgentRuntimeState;
+  debug?: boolean;
 }
 
 const STATE_CLASSES: Record<AgentRuntimeState["state"], string> = {
-  waiting: "border-neutral-200 bg-neutral-50 text-neutral-400",
-  running: "border-blue-400 bg-white text-neutral-900 animate-pulse-subtle",
-  "tool-use": "border-blue-500 bg-white text-neutral-900",
-  done: "border-emerald-400 bg-white text-neutral-900",
-  error: "border-red-400 bg-red-50 text-red-700",
+  waiting:    "border-stone-200 bg-stone-50 text-stone-400",
+  running:    "border-[#c2410c] bg-white text-stone-900 animate-pulse-subtle",
+  "tool-use": "border-[#c2410c] bg-white text-stone-900 animate-pulse-subtle",
+  done:       "border-stone-300 border-t-2 border-t-stone-700 bg-white text-stone-900",
+  error:      "border-stone-200 border-l-4 border-l-red-700 bg-white text-stone-900",
 };
 
-export default function AgentPane({ agent, runtime }: Props) {
+export default function AgentPane({ agent, runtime, debug = false }: Props) {
   const meta = AGENT_REGISTRY[agent];
+  const showImageSlots = agent === "designer" && (runtime.state === "running" || runtime.state === "tool-use" || runtime.state === "done");
+
   return (
     <div
       data-testid={`${agent}-pane`}
       data-state={runtime.state}
-      className={`rounded-lg border p-4 transition-colors ${STATE_CLASSES[runtime.state]}`}
+      className={`rounded-lg border p-4 transition-colors duration-200 ${STATE_CLASSES[runtime.state]}`}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-serif text-lg">{meta.label}</h3>
-        <span className="text-xs uppercase tracking-wide text-neutral-500">{runtime.state}</span>
+        <h3 className="font-serif text-lg text-stone-950">{meta.label}</h3>
+        <span className="text-[10px] uppercase tracking-[0.14em] text-stone-500">{runtime.state}</span>
       </div>
-      <p className="mt-1 text-xs text-neutral-500">{meta.blurb}</p>
+      <p className="mt-1 text-xs text-stone-500">{meta.blurb}</p>
 
       {runtime.toolQueries.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
+        <div className="mt-3 flex flex-wrap gap-1">
           {runtime.toolQueries.map((q, i) => <ToolUseChip key={i} query={q} />)}
         </div>
       )}
 
-      {runtime.images.length > 0 && (
+      {showImageSlots && (
         <div className="mt-3 grid grid-cols-3 gap-2">
-          {runtime.images
-            .slice()
-            .sort((a, b) => a.index - b.index)
-            .map((img) => (
-              <img key={img.index} src={img.url} alt="" className="aspect-square w-full rounded border bg-white object-contain" />
-            ))}
+          {[0, 1, 2].map((i) => {
+            const img = runtime.images.find((x) => x.index === i);
+            return img ? (
+              <img key={i} src={img.url} alt="" className="aspect-square w-full rounded border border-stone-200 bg-white object-contain" />
+            ) : (
+              <div key={i} className="aspect-square w-full rounded border border-stone-200 bg-stone-100" aria-hidden />
+            );
+          })}
         </div>
       )}
 
       {runtime.streamedText && (
-        <pre className="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-50 p-2 text-xs text-neutral-700">
-          {runtime.streamedText.slice(-600)}
-        </pre>
+        <div className="mt-4 border-l border-stone-200 pl-3">
+          <p className="max-h-32 overflow-auto whitespace-pre-wrap break-words font-sans italic text-sm text-stone-600 leading-relaxed">
+            {runtime.streamedText.slice(-600)}
+          </p>
+        </div>
       )}
 
-      {runtime.error && <p className="mt-2 text-sm text-red-700">Error: {runtime.error}</p>}
+      {runtime.error && <p className="mt-4 text-sm text-red-900">Error: {runtime.error}</p>}
+
+      {debug && <AgentPaneDebug events={runtime.events} streamedText={runtime.streamedText} />}
     </div>
   );
 }

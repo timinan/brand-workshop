@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { WorkshopEvent } from "@/lib/events/types";
 import type { AgentName, BrandKit as BrandKitData } from "@/lib/agents/types";
 import BriefInput from "./BriefInput";
@@ -10,22 +11,48 @@ import BrandKit from "./BrandKit";
 
 export type PaneState = "waiting" | "running" | "tool-use" | "done" | "error";
 
+export interface AgentRuntimeEvent {
+  ts: number;
+  type: WorkshopEvent["type"];
+  payload: WorkshopEvent;
+}
+
 export interface AgentRuntimeState {
   state: PaneState;
   streamedText: string;
   toolQueries: string[];
   images: { index: number; url: string }[];
   error: string | null;
+  events: AgentRuntimeEvent[];
 }
 
 const INITIAL: Record<AgentName, AgentRuntimeState> = {
-  namer:        { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  "brand-scout":{ state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  designer:     { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  copywriter:   { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  strategist:   { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  director:     { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
+  namer:        { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  "brand-scout":{ state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  designer:     { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  copywriter:   { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  strategist:   { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  director:     { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
 };
+
+function targetAgent(event: WorkshopEvent): AgentName | null {
+  switch (event.type) {
+    case "agent_started":
+    case "agent_streaming":
+    case "agent_tool_use":
+    case "agent_completed":
+      return event.agent;
+    case "image_generated":
+      return "designer";
+    case "auto_swap":
+      return "brand-scout";
+    case "workshop_error":
+      return event.agent ?? null;
+    case "workshop_started":
+    case "brand_kit_ready":
+      return null;
+  }
+}
 
 export default function Workshop() {
   const [brief, setBrief] = useState("");
@@ -33,39 +60,54 @@ export default function Workshop() {
   const [agents, setAgents] = useState<Record<AgentName, AgentRuntimeState>>(INITIAL);
   const [brandKit, setBrandKit] = useState<BrandKitData | null>(null);
   const [autoSwap, setAutoSwap] = useState<{ from: string; to: string; reason: string } | null>(null);
+  const [workshopError, setWorkshopError] = useState<string | null>(null);
+  const debug = useSearchParams()?.get("debug") === "1";
 
   function reset() {
     setAgents(INITIAL);
     setBrandKit(null);
     setAutoSwap(null);
+    setWorkshopError(null);
   }
 
   async function start() {
     reset();
     setRunning(true);
-    const res = await fetch("/api/workshop", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brief }),
-    });
-    if (!res.body) { setRunning(false); return; }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const frames = buf.split("\n\n");
-      buf = frames.pop() ?? "";
-      for (const frame of frames) {
-        const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
-        if (!dataLine) continue;
-        const event = JSON.parse(dataLine.slice(6)) as WorkshopEvent;
-        applyEvent(event);
+    try {
+      const res = await fetch("/api/workshop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brief }),
+      });
+      if (!res.ok) {
+        setWorkshopError((await res.text()) || `Request failed (${res.status})`);
+        return;
       }
+      if (!res.body) {
+        setWorkshopError("No response from server.");
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const frames = buf.split("\n\n");
+        buf = frames.pop() ?? "";
+        for (const frame of frames) {
+          const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
+          if (!dataLine) continue;
+          const event = JSON.parse(dataLine.slice(6)) as WorkshopEvent;
+          applyEvent(event);
+        }
+      }
+    } catch (err) {
+      setWorkshopError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunning(false);
     }
-    setRunning(false);
   }
 
   function applyEvent(event: WorkshopEvent) {
@@ -88,18 +130,33 @@ export default function Workshop() {
           next.designer = { ...next.designer, images: [...next.designer.images, { index: event.conceptIndex, url: event.url }] };
           break;
         case "workshop_error":
-          if (event.agent) next[event.agent] = { ...next[event.agent], state: "error", error: event.error };
+          if (event.agent) {
+            next[event.agent] = { ...next[event.agent], state: "error", error: event.error };
+          }
           break;
+      }
+      const target = targetAgent(event);
+      if (target) {
+        next[target] = {
+          ...next[target],
+          events: [...next[target].events, { ts: Date.now(), type: event.type, payload: event }],
+        };
       }
       return next;
     });
     if (event.type === "auto_swap") setAutoSwap({ from: event.from, to: event.to, reason: event.reason });
     if (event.type === "brand_kit_ready") setBrandKit(event.brandKit);
+    if (event.type === "workshop_error" && !event.agent) setWorkshopError(event.error);
   }
 
   return (
     <div className="space-y-8">
       <BriefInput brief={brief} onChange={setBrief} onGenerate={start} disabled={running} />
+      {workshopError && (
+        <p className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
+          {workshopError}
+        </p>
+      )}
       <PresetChips
           onPick={(_id, b, cached) => {
             setBrief(b);
@@ -116,13 +173,13 @@ export default function Workshop() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-4">
-          <AgentPane agent="namer" runtime={agents.namer} />
-          <AgentPane agent="brand-scout" runtime={agents["brand-scout"]} />
+          <AgentPane agent="namer" runtime={agents.namer} debug={debug} />
+          <AgentPane agent="brand-scout" runtime={agents["brand-scout"]} debug={debug} />
         </div>
         <div className="space-y-4">
-          <AgentPane agent="designer" runtime={agents.designer} />
-          <AgentPane agent="copywriter" runtime={agents.copywriter} />
-          <AgentPane agent="strategist" runtime={agents.strategist} />
+          <AgentPane agent="designer" runtime={agents.designer} debug={debug} />
+          <AgentPane agent="copywriter" runtime={agents.copywriter} debug={debug} />
+          <AgentPane agent="strategist" runtime={agents.strategist} debug={debug} />
         </div>
       </div>
 

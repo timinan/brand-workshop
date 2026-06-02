@@ -57,7 +57,7 @@ describe("runWorkshop", () => {
     const llm = llmThatReturns(goodNamer, goodScout, goodCopy, goodStrategy);
     await runWorkshop({
       brief: "an AI tool for PMs",
-      llm, search, image,
+      getLlm: () => llm, getSearch: () => search, getImage: () => image,
       emit: (e) => events.push(e),
     });
     expect(events[0].type).toBe("workshop_started");
@@ -69,7 +69,7 @@ describe("runWorkshop", () => {
     const events: WorkshopEvent[] = [];
     const llm = llmThatReturns(goodNamer, swapScout, goodScout, goodCopy, goodStrategy);
     await runWorkshop({
-      brief: "x", llm, search, image,
+      brief: "x", getLlm: () => llm, getSearch: () => search, getImage: () => image,
       emit: (e) => events.push(e),
     });
     expect(events.find((e) => e.type === "auto_swap")).toBeTruthy();
@@ -78,7 +78,7 @@ describe("runWorkshop", () => {
   it("aborts with workshop_error when Namer fails schema", async () => {
     const events: WorkshopEvent[] = [];
     const llm = llmThatReturns("not valid json", goodScout, goodCopy, goodStrategy);
-    await runWorkshop({ brief: "x", llm, search, image, emit: (e) => events.push(e) });
+    await runWorkshop({ brief: "x", getLlm: () => llm, getSearch: () => search, getImage: () => image, emit: (e) => events.push(e) });
     expect(events.find((e) => e.type === "workshop_error" && e.agent === "namer")).toBeTruthy();
     expect(events.find((e) => e.type === "brand_kit_ready")).toBeUndefined();
   });

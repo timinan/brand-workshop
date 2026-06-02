@@ -10,7 +10,8 @@ adapter — switch providers with a single env var, no code changes.
 
 ```bash
 cp .env.example .env.local
-# Fill in free-tier keys: GEMINI_API_KEY, BRAVE_API_KEY, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN
+# Fill in free-tier keys: BRAVE_API_KEY, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN
+# (Set GEMINI_API_KEY only if you want to fall back via LLM_PROVIDER=gemini.)
 npm install
 npm run dev
 ```
@@ -21,7 +22,7 @@ Visit http://localhost:3000.
 
 | Mode | LLM | Search | Image | Cost / run |
 |---|---|---|---|---|
-| **Free (default)** | Gemini 2.0 Flash | Brave Search | Cloudflare Workers AI (FLUX) | $0 |
+| **Free (default)** | Cloudflare Workers AI (Llama 3.3 70B) | Brave Search | Cloudflare Workers AI (FLUX) | $0 |
 | **Paid** | Claude Sonnet 4.6 | Anthropic web_search | fal.ai (FLUX) | ~$0.05-0.10 |
 
 Switch via env vars: `LLM_PROVIDER`, `SEARCH_PROVIDER`, `IMAGE_PROVIDER`, `MODE`.
@@ -52,14 +53,15 @@ results to `lib/presets/data.ts`. Commit the updated file.
 ```bash
 npx vercel link
 # Add production env vars (one per command):
-npx vercel env add GEMINI_API_KEY production
 npx vercel env add BRAVE_API_KEY production
 npx vercel env add CLOUDFLARE_ACCOUNT_ID production
 npx vercel env add CLOUDFLARE_API_TOKEN production
-npx vercel env add LLM_PROVIDER production           # value: gemini
+npx vercel env add LLM_PROVIDER production           # value: cloudflare
 npx vercel env add SEARCH_PROVIDER production        # value: brave
 npx vercel env add IMAGE_PROVIDER production         # value: cloudflare
 npx vercel env add MODE production                   # value: free
+# Optional — override default model: CLOUDFLARE_LLM_MODEL
+# Optional — legacy fallback: GEMINI_API_KEY (only if LLM_PROVIDER=gemini)
 # Optional — paid mode + KV: connect Vercel KV via dashboard → Storage → KV.
 # Optional — paid providers: ANTHROPIC_API_KEY, FAL_KEY, DAILY_COST_CAP_USD.
 
