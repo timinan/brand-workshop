@@ -13,9 +13,9 @@ async function main() {
     let kit: BrandKit | null = null;
     await runWorkshop({
       brief: preset.brief,
-      llm: getLLMProvider(),
-      search: getSearchProvider(),
-      image: getImageProvider(),
+      getLlm: getLLMProvider,
+      getSearch: getSearchProvider,
+      getImage: getImageProvider,
       emit: (e) => { if (e.type === "brand_kit_ready") kit = e.brandKit; },
     });
     if (!kit) throw new Error(`Preset ${preset.id} failed`);

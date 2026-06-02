@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
       try {
         await runWorkshop({
           brief,
-          llm: getLLMProvider(),
-          search: getSearchProvider(),
-          image: getImageProvider(),
+          getLlm: getLLMProvider,
+          getSearch: getSearchProvider,
+          getImage: getImageProvider,
           emit,
         });
       } catch (err) {
