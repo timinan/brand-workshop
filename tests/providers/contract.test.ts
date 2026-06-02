@@ -8,6 +8,7 @@ vi.mock("@fal-ai/serverless-client", () => ({
 }));
 import { GeminiProvider } from "@/lib/providers/llm/gemini";
 import { AnthropicProvider } from "@/lib/providers/llm/anthropic";
+import { CloudflareLLMProvider } from "@/lib/providers/llm/cloudflare";
 import { BraveSearchProvider } from "@/lib/providers/search/brave";
 import { AnthropicSearchProvider } from "@/lib/providers/search/anthropic";
 import { CloudflareImageProvider } from "@/lib/providers/image/cloudflare";
@@ -15,7 +16,7 @@ import { FalImageProvider } from "@/lib/providers/image/fal";
 
 function assertIsLLM(p: LLMProvider) {
   expect(typeof p.stream).toBe("function");
-  expect(p.name === "gemini" || p.name === "anthropic").toBe(true);
+  expect(p.name === "gemini" || p.name === "anthropic" || p.name === "cloudflare").toBe(true);
 }
 function assertIsSearch(p: SearchProvider) {
   expect(typeof p.search).toBe("function");
@@ -30,6 +31,7 @@ describe("provider contracts", () => {
   it("LLM providers all conform", () => {
     assertIsLLM(new GeminiProvider({ apiKey: "x" }));
     assertIsLLM(new AnthropicProvider({ apiKey: "x" }));
+    assertIsLLM(new CloudflareLLMProvider({ accountId: "a", apiToken: "t" }));
   });
   it("Search providers all conform", () => {
     assertIsSearch(new BraveSearchProvider({ apiKey: "x" }));
