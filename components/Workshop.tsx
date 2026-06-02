@@ -10,22 +10,48 @@ import BrandKit from "./BrandKit";
 
 export type PaneState = "waiting" | "running" | "tool-use" | "done" | "error";
 
+export interface AgentRuntimeEvent {
+  ts: number;
+  type: WorkshopEvent["type"];
+  payload: WorkshopEvent;
+}
+
 export interface AgentRuntimeState {
   state: PaneState;
   streamedText: string;
   toolQueries: string[];
   images: { index: number; url: string }[];
   error: string | null;
+  events: AgentRuntimeEvent[];
 }
 
 const INITIAL: Record<AgentName, AgentRuntimeState> = {
-  namer:        { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  "brand-scout":{ state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  designer:     { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  copywriter:   { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  strategist:   { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
-  director:     { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null },
+  namer:        { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  "brand-scout":{ state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  designer:     { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  copywriter:   { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  strategist:   { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
+  director:     { state: "waiting", streamedText: "", toolQueries: [], images: [], error: null, events: [] },
 };
+
+function targetAgent(event: WorkshopEvent): AgentName | null {
+  switch (event.type) {
+    case "agent_started":
+    case "agent_streaming":
+    case "agent_tool_use":
+    case "agent_completed":
+      return event.agent;
+    case "image_generated":
+      return "designer";
+    case "auto_swap":
+      return "brand-scout";
+    case "workshop_error":
+      return event.agent ?? null;
+    case "workshop_started":
+    case "brand_kit_ready":
+      return null;
+  }
+}
 
 export default function Workshop() {
   const [brief, setBrief] = useState("");
@@ -90,6 +116,13 @@ export default function Workshop() {
         case "workshop_error":
           if (event.agent) next[event.agent] = { ...next[event.agent], state: "error", error: event.error };
           break;
+      }
+      const target = targetAgent(event);
+      if (target) {
+        next[target] = {
+          ...next[target],
+          events: [...next[target].events, { ts: Date.now(), type: event.type, payload: event }],
+        };
       }
       return next;
     });
