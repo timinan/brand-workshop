@@ -1,6 +1,6 @@
 import type { LLMProvider } from "@/lib/providers/types";
 import { CopywriterOutputSchema, type CopywriterOutput } from "./types";
-import { extractJson } from "./namer";
+import { parseLlmJson } from "@/lib/parse-llm-json";
 
 const SYSTEM_PROMPT = `You are a brand copywriter. Given a brand name and a brief, write 3 taglines AND a one-line voice descriptor.
 
@@ -49,5 +49,5 @@ export async function runCopywriter(args: CopywriterArgs): Promise<CopywriterOut
       full = chunk.fullText || full;
     }
   }
-  return CopywriterOutputSchema.parse(JSON.parse(extractJson(full)));
+  return CopywriterOutputSchema.parse(parseLlmJson(full));
 }

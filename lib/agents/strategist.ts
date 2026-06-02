@@ -1,10 +1,16 @@
 import type { LLMProvider, SearchProvider, SearchResult } from "@/lib/providers/types";
 import { StrategistOutputSchema, type StrategistOutput } from "./types";
-import { extractJson } from "./namer";
+import { parseLlmJson } from "@/lib/parse-llm-json";
 
 const SYSTEM_PROMPT = `You are a product strategist. Given a brand name, a brief, and competitive search results, produce a positioning statement, 2-3 real competitors, a differentiation sentence, and one strategic risk.
 
 You MUST use real competitors that appeared in the search results. Do NOT invent competitors. Each competitor needs a real URL.
+
+Keep every string concise (hard limits):
+- positioning: max 400 characters (2-3 short sentences)
+- differentiation: max 280 characters (1 sentence)
+- risk: max 280 characters (1 sentence)
+- differentiator: max 160 characters each
 
 Respond ONLY with raw JSON (no prose, no markdown):
 {
@@ -57,5 +63,5 @@ Produce the JSON.`;
       full = chunk.fullText || full;
     }
   }
-  return StrategistOutputSchema.parse(JSON.parse(extractJson(full)));
+  return StrategistOutputSchema.parse(parseLlmJson(full));
 }

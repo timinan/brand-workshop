@@ -39,4 +39,22 @@ describe("runStrategist", () => {
     expect(out.competitors.length).toBeGreaterThanOrEqual(2);
     expect(out.positioning).toContain("PMs");
   });
+
+  it("clamps positioning longer than 400 characters", async () => {
+    const json = JSON.stringify({
+      positioning: "x".repeat(500),
+      competitors: [
+        { name: "Notion", url: "https://notion.so", differentiator: "workspace" },
+        { name: "Linear", url: "https://linear.app", differentiator: "issues" },
+      ],
+      differentiation: "d",
+      risk: "r",
+    });
+    const out = await runStrategist({
+      name: "Pebble", brief: "x",
+      llm: llmReturning(json), search,
+      onDelta: () => {}, onSearch: () => {},
+    });
+    expect(out.positioning.length).toBeLessThanOrEqual(400);
+  });
 });
