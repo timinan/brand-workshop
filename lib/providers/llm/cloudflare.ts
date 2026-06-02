@@ -57,6 +57,9 @@ export class CloudflareLLMProvider implements LLMProvider {
     };
     const tools = toOpenAITools(opts.tools);
     if (tools) body.tools = tools;
+    if (opts.responseSchema) {
+      body.response_format = { type: "json_object" };
+    }
 
     const res = await fetch(url, {
       method: "POST",

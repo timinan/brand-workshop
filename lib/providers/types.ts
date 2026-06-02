@@ -17,12 +17,17 @@ export type LLMChunk =
   | { type: "tool_result"; tool: ToolName; result: SearchResult[] }
   | { type: "done"; fullText: string };
 
+/** OpenAPI-style schema subset supported by Gemini `responseSchema`. */
+export type JsonResponseSchema = Record<string, unknown>;
+
 export interface LLMStreamOptions {
   systemPrompt: string;
   userPrompt: string;
   tools?: ToolDefinition[];
   maxTokens?: number;
   temperature?: number;
+  /** When set, Gemini returns constrained JSON (other providers ignore). */
+  responseSchema?: JsonResponseSchema;
 }
 
 export interface LLMProvider {
