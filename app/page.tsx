@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Workshop from "@/components/Workshop";
 
 export default function Page() {
@@ -9,7 +10,9 @@ export default function Page() {
           One sentence in, full brand kit <em className="font-display-italic text-[#c2410c]">out</em>.
         </h1>
       </header>
-      <Workshop />
+      <Suspense fallback={null}>
+        <Workshop />
+      </Suspense>
     </main>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { WorkshopEvent } from "@/lib/events/types";
 import type { AgentName, BrandKit as BrandKitData } from "@/lib/agents/types";
 import BriefInput from "./BriefInput";
@@ -59,6 +60,7 @@ export default function Workshop() {
   const [agents, setAgents] = useState<Record<AgentName, AgentRuntimeState>>(INITIAL);
   const [brandKit, setBrandKit] = useState<BrandKitData | null>(null);
   const [autoSwap, setAutoSwap] = useState<{ from: string; to: string; reason: string } | null>(null);
+  const debug = useSearchParams()?.get("debug") === "1";
 
   function reset() {
     setAgents(INITIAL);
@@ -149,13 +151,13 @@ export default function Workshop() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-4">
-          <AgentPane agent="namer" runtime={agents.namer} />
-          <AgentPane agent="brand-scout" runtime={agents["brand-scout"]} />
+          <AgentPane agent="namer" runtime={agents.namer} debug={debug} />
+          <AgentPane agent="brand-scout" runtime={agents["brand-scout"]} debug={debug} />
         </div>
         <div className="space-y-4">
-          <AgentPane agent="designer" runtime={agents.designer} />
-          <AgentPane agent="copywriter" runtime={agents.copywriter} />
-          <AgentPane agent="strategist" runtime={agents.strategist} />
+          <AgentPane agent="designer" runtime={agents.designer} debug={debug} />
+          <AgentPane agent="copywriter" runtime={agents.copywriter} debug={debug} />
+          <AgentPane agent="strategist" runtime={agents.strategist} debug={debug} />
         </div>
       </div>
 
