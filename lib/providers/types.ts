@@ -26,7 +26,7 @@ export interface LLMStreamOptions {
 }
 
 export interface LLMProvider {
-  readonly name: "anthropic" | "gemini";
+  readonly name: "anthropic" | "gemini" | "cloudflare";
   stream(opts: LLMStreamOptions): AsyncIterable<LLMChunk>;
 }
 
