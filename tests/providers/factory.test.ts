@@ -11,9 +11,9 @@ describe("provider factory", () => {
     process.env.FAL_KEY = "f";
   });
 
-  it("returns Gemini by default", () => {
+  it("returns Cloudflare by default", () => {
     delete process.env.LLM_PROVIDER;
-    expect(getLLMProvider().name).toBe("gemini");
+    expect(getLLMProvider().name).toBe("cloudflare");
   });
 
   it("returns Anthropic when LLM_PROVIDER=anthropic", () => {
