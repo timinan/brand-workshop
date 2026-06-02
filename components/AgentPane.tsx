@@ -1,11 +1,13 @@
 import type { AgentName } from "@/lib/agents/types";
 import { AGENT_REGISTRY } from "@/lib/agents/registry";
 import ToolUseChip from "./ToolUseChip";
+import AgentPaneDebug from "./AgentPaneDebug";
 import type { AgentRuntimeState } from "./Workshop";
 
 interface Props {
   agent: AgentName;
   runtime: AgentRuntimeState;
+  debug?: boolean;
 }
 
 const STATE_CLASSES: Record<AgentRuntimeState["state"], string> = {
@@ -16,7 +18,7 @@ const STATE_CLASSES: Record<AgentRuntimeState["state"], string> = {
   error:      "border-stone-200 border-l-4 border-l-red-700 bg-white text-stone-900",
 };
 
-export default function AgentPane({ agent, runtime }: Props) {
+export default function AgentPane({ agent, runtime, debug = false }: Props) {
   const meta = AGENT_REGISTRY[agent];
   const showImageSlots = agent === "designer" && (runtime.state === "running" || runtime.state === "tool-use" || runtime.state === "done");
 
@@ -60,6 +62,8 @@ export default function AgentPane({ agent, runtime }: Props) {
       )}
 
       {runtime.error && <p className="mt-4 text-sm text-red-900">Error: {runtime.error}</p>}
+
+      {debug && <AgentPaneDebug events={runtime.events} streamedText={runtime.streamedText} />}
     </div>
   );
 }
