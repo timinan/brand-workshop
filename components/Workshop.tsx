@@ -72,6 +72,7 @@ export default function Workshop() {
   const [brandScoutOutput, setBrandScoutOutput] = useState<BrandScoutOutput | null>(null);
   const [brandKit, setBrandKit] = useState<BrandKitData | null>(null);
   const [workshopError, setWorkshopError] = useState<string | null>(null);
+  const [avoidNames, setAvoidNames] = useState<string[]>([]);
   const debug = useSearchParams()?.get("debug") === "1";
 
   function reset() {
@@ -82,6 +83,7 @@ export default function Workshop() {
     setBrandScoutOutput(null);
     setBrandKit(null);
     setWorkshopError(null);
+    setAvoidNames([]);
   }
 
   function applyEvent(event: WorkshopEvent) {
@@ -166,9 +168,14 @@ export default function Workshop() {
   }
 
   async function runNaming() {
-    reset();
+    setAgents({ ...INITIAL_AGENTS });
+    setCandidates(null);
+    setChosenName(null);
+    setBrandScoutOutput(null);
+    setBrandKit(null);
+    setWorkshopError(null);
     setPhase("naming");
-    const { events, error } = await streamPhase("/api/workshop/names", { brief });
+    const { events, error } = await streamPhase("/api/workshop/names", { brief, avoid: avoidNames });
     if (error) {
       setPhase("idle");
       return;
@@ -178,7 +185,9 @@ export default function Workshop() {
         e.type === "agent_completed" && e.agent === "namer",
     );
     if (completed) {
-      setCandidates(completed.output as NamerOutput);
+      const namerOutput = completed.output as NamerOutput;
+      setCandidates(namerOutput);
+      setAvoidNames((prev) => [...prev, ...namerOutput.candidates.map((c) => c.name)]);
       setPhase("picking");
     } else {
       const errEvent = events.find((e) => e.type === "workshop_error");
