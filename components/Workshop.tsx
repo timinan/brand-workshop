@@ -59,7 +59,6 @@ function targetAgent(event: WorkshopEvent): AgentName | null {
       return event.agent ?? null;
     case "workshop_started":
     case "brand_kit_ready":
-    case "auto_swap":
       return null;
   }
 }
