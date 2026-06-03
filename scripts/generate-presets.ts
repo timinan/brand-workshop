@@ -2,23 +2,45 @@ import "dotenv/config";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PRESETS } from "@/lib/presets/briefs";
-import { runWorkshop } from "@/lib/orchestrator/workshop";
+import {
+  runNamerPhase,
+  runBrandScoutPhase,
+  runFinishPhase,
+} from "@/lib/orchestrator/workshop";
 import { getLLMProvider, getSearchProvider, getImageProvider } from "@/lib/providers/factory";
 import type { BrandKit } from "@/lib/agents/types";
+import type { WorkshopEvent } from "@/lib/events/types";
 
 async function main() {
   const out: Record<string, BrandKit> = {};
   for (const preset of PRESETS) {
     console.log(`Generating preset: ${preset.label}`);
-    let kit: BrandKit | null = null;
-    await runWorkshop({
+
+    const noop = (_e: WorkshopEvent) => {};
+
+    const namer = await runNamerPhase({
       brief: preset.brief,
+      getLlm: getLLMProvider,
+      emit: noop,
+    });
+    const chosenName = namer.top_pick;
+    const brandScout = await runBrandScoutPhase({
+      brief: preset.brief,
+      chosenName,
+      getLlm: getLLMProvider,
+      getSearch: getSearchProvider,
+      emit: noop,
+    });
+    const kit = await runFinishPhase({
+      brief: preset.brief,
+      chosenName,
+      namerOutput: namer,
+      brandScoutOutput: brandScout,
       getLlm: getLLMProvider,
       getSearch: getSearchProvider,
       getImage: getImageProvider,
-      emit: (e) => { if (e.type === "brand_kit_ready") kit = e.brandKit; },
+      emit: noop,
     });
-    if (!kit) throw new Error(`Preset ${preset.id} failed`);
     out[preset.id] = kit;
   }
 
