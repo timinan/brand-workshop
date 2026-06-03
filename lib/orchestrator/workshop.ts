@@ -18,12 +18,13 @@ function errorMessage(err: unknown): string {
 
 export interface NamerPhaseArgs {
   brief: string;
+  avoid?: string[];
   getLlm: () => LLMProvider;
   emit: (event: WorkshopEvent) => void;
 }
 
 export async function runNamerPhase(args: NamerPhaseArgs): Promise<NamerOutput> {
-  const { brief, getLlm, emit } = args;
+  const { brief, avoid, getLlm, emit } = args;
   emit({ type: "workshop_started", brief });
 
   let llm: LLMProvider;
@@ -39,6 +40,7 @@ export async function runNamerPhase(args: NamerPhaseArgs): Promise<NamerOutput> 
     const namer = await runNamer({
       brief,
       llm,
+      avoid,
       onDelta: (delta) => emit({ type: "agent_streaming", agent: "namer", delta }),
     });
     emit({ type: "agent_completed", agent: "namer", output: namer });
