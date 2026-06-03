@@ -31,11 +31,6 @@ const goodScout = JSON.stringify({
   scorecard: { existingCompany: "pass", domain: "pass", trademark: "pass", connotations: "pass" },
   findings: [], recommendation: "proceed", vettedName: "Pebble",
 });
-const swapScout = JSON.stringify({
-  scorecard: { existingCompany: "fail", domain: "pass", trademark: "pass", connotations: "pass" },
-  findings: [{ category: "existingCompany", finding: "exact match" }],
-  recommendation: "swap_to_next", vettedName: "Pebble",
-});
 const goodCopy = JSON.stringify({
   taglines: [
     { tagline: "T1", angle: "witty" }, { tagline: "T2", angle: "clear" }, { tagline: "T3", angle: "aspirational" },
@@ -65,14 +60,15 @@ describe("runWorkshop", () => {
     expect(events.at(-1)?.type).toBe("brand_kit_ready");
   });
 
-  it("emits auto_swap and re-runs Brand Scout when first scout says swap_to_next", async () => {
+  it("runs Brand Scout exactly once and ignores swap_to_next recommendation", async () => {
     const events: WorkshopEvent[] = [];
-    const llm = llmThatReturns(goodNamer, swapScout, goodScout, goodCopy, goodStrategy);
+    const llm = llmThatReturns(goodNamer, goodScout, goodCopy, goodStrategy);
     await runWorkshop({
       brief: "x", getLlm: () => llm, getSearch: () => search, getImage: () => image,
       emit: (e) => events.push(e),
     });
-    expect(events.find((e) => e.type === "auto_swap")).toBeTruthy();
+    expect(events.filter((e) => e.type === "agent_started" && e.agent === "brand-scout").length).toBe(1);
+    expect(events.find((e) => e.type === "auto_swap")).toBeUndefined();
   });
 
   it("aborts with workshop_error when Namer fails schema", async () => {
