@@ -181,11 +181,14 @@ export default function Workshop() {
       setCandidates(completed.output as NamerOutput);
       setPhase("picking");
     } else {
+      const errEvent = events.find((e) => e.type === "workshop_error");
+      if (errEvent) setWorkshopError(errEvent.error);
       setPhase("idle");
     }
   }
 
   async function runVetting(name: string) {
+    setWorkshopError(null);
     setChosenName(name);
     setPhase("vetting");
     setAgents((prev) => ({ ...prev, "brand-scout": { ...INITIAL_AGENT } }));
@@ -202,12 +205,15 @@ export default function Workshop() {
       setBrandScoutOutput(completed.output as BrandScoutOutput);
       setPhase("confirming");
     } else {
+      const errEvent = events.find((e) => e.type === "workshop_error");
+      if (errEvent) setWorkshopError(errEvent.error);
       setPhase("picking");
     }
   }
 
   async function runFinishing() {
     if (!candidates || !brandScoutOutput || !chosenName) return;
+    setWorkshopError(null);
     setPhase("building");
     setAgents((prev) => ({
       ...prev,
@@ -215,7 +221,7 @@ export default function Workshop() {
       copywriter: { ...INITIAL_AGENT },
       strategist: { ...INITIAL_AGENT },
     }));
-    const { error } = await streamPhase("/api/workshop/finish", {
+    const { events, error } = await streamPhase("/api/workshop/finish", {
       brief,
       chosenName,
       namerOutput: candidates,
@@ -225,7 +231,14 @@ export default function Workshop() {
       setPhase("confirming");
       return;
     }
-    setPhase("done");
+    const ready = events.some((e) => e.type === "brand_kit_ready");
+    if (ready) {
+      setPhase("done");
+    } else {
+      const errEvent = events.find((e) => e.type === "workshop_error");
+      setWorkshopError(errEvent?.error ?? "Workshop did not complete.");
+      setPhase("confirming");
+    }
   }
 
   function pickAgain() {
