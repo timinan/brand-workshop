@@ -85,6 +85,28 @@ describe("runNamerPhase", () => {
     ).rejects.toBeTruthy();
     expect(events.find((e) => e.type === "workshop_error" && e.agent === "namer")).toBeTruthy();
   });
+
+  it("includes avoid names in the Namer user prompt when provided", async () => {
+    const events: WorkshopEvent[] = [];
+    let capturedPrompt = "";
+    const llm: LLMProvider = {
+      name: "gemini",
+      async *stream(opts): AsyncIterable<LLMChunk> {
+        capturedPrompt = opts.userPrompt;
+        yield { type: "text_delta", text: goodNamerJson };
+        yield { type: "done", fullText: goodNamerJson };
+      },
+    };
+    await runNamerPhase({
+      brief: "an AI tool for PMs",
+      avoid: ["Foo", "Bar"],
+      getLlm: () => llm,
+      emit: (e) => events.push(e),
+    });
+    expect(capturedPrompt).toContain("Foo");
+    expect(capturedPrompt).toContain("Bar");
+    expect(capturedPrompt).toContain("do NOT repeat");
+  });
 });
 
 describe("runBrandScoutPhase", () => {
