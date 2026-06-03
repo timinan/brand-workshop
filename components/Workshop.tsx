@@ -168,6 +168,11 @@ export default function Workshop() {
   }
 
   async function runNaming() {
+    const isRegenerate = phase === "picking";
+    const avoidToSend = isRegenerate ? avoidNames.slice(-30) : [];
+    if (!isRegenerate) {
+      setAvoidNames([]);
+    }
     setAgents({ ...INITIAL_AGENTS });
     setCandidates(null);
     setChosenName(null);
@@ -175,7 +180,7 @@ export default function Workshop() {
     setBrandKit(null);
     setWorkshopError(null);
     setPhase("naming");
-    const { events, error } = await streamPhase("/api/workshop/names", { brief, avoid: avoidNames });
+    const { events, error } = await streamPhase("/api/workshop/names", { brief, avoid: avoidToSend });
     if (error) {
       setPhase("idle");
       return;
@@ -187,7 +192,10 @@ export default function Workshop() {
     if (completed) {
       const namerOutput = completed.output as NamerOutput;
       setCandidates(namerOutput);
-      setAvoidNames((prev) => [...prev, ...namerOutput.candidates.map((c) => c.name)]);
+      setAvoidNames((prev) => {
+        const combined = [...prev, ...namerOutput.candidates.map((c) => c.name)];
+        return combined.slice(-30);
+      });
       setPhase("picking");
     } else {
       const errEvent = events.find((e) => e.type === "workshop_error");
