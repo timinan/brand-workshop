@@ -1,7 +1,7 @@
 import { SchemaType } from "@google/generative-ai";
 import type { LLMProvider } from "@/lib/providers/types";
 import { parseLlmJson } from "@/lib/parse-llm-json";
-import { NamerOutputSchema, type NamerOutput } from "./types";
+import { NamerOutputSchema, type NamerOutput, NamerSimilarOutputSchema, type NamerSimilarOutput } from "./types";
 
 const SYSTEM_PROMPT = `You are a brand naming expert. Given a one-sentence startup brief, generate 3 distinct candidate company names.
 
@@ -84,6 +84,70 @@ export async function runNamer(args: NamerArgs): Promise<NamerOutput> {
       const full = await streamNamerResponse(args, attempt);
       const parsed = parseLlmJson(full);
       return NamerOutputSchema.parse(parsed);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+const SIMILAR_SYSTEM_PROMPT = `You are a brand naming expert. The user picked a name they liked, but a safety check failed on it. Generate ONE alternative name that feels similar in vibe to the rejected name but avoids the specific safety problems listed.
+
+The new name must be:
+- 1-2 words, 4-14 characters
+- Easy to spell and pronounce
+- Brandable, not a generic descriptor
+- Distinct from the rejected name AND the avoid list AND likely to avoid the listed failed checks
+
+Give one sentence of reasoning.
+
+Respond ONLY with a single JSON object. In "reasoning" strings use plain words only — no double-quote characters, no apostrophes.`;
+
+export interface NamerSimilarArgs {
+  brief: string;
+  similarTo: { name: string; failedChecks: string[] };
+  avoid: string[];
+  llm: LLMProvider;
+  onDelta: (text: string) => void;
+}
+
+function buildSimilarUserPrompt(args: NamerSimilarArgs, attempt: number): string {
+  const jsonShape = '{"candidate":{"name":"NameOne","reasoning":"one short sentence"}}';
+  const failed = args.similarTo.failedChecks.length > 0
+    ? `Failed safety checks to address: ${args.similarTo.failedChecks.join(", ")}.`
+    : "Pick a name with the same vibe.";
+  const avoidLine = args.avoid.length > 0
+    ? `Do NOT use any of these: ${args.avoid.join(", ")}.`
+    : "";
+  const intro =
+    attempt === 0
+      ? `Brief: ${args.brief}\n\nRejected name: ${args.similarTo.name}\n${failed}\n${avoidLine}\n\nReturn JSON exactly in this shape:\n${jsonShape}`
+      : `Brief: ${args.brief}\n\nRejected name: ${args.similarTo.name}\n${failed}\n${avoidLine}\n\nYour previous reply was invalid JSON. Output ONLY raw JSON in this shape with no extra text:\n${jsonShape}`;
+  return intro;
+}
+
+export async function runNamerSimilar(args: NamerSimilarArgs): Promise<NamerSimilarOutput["candidate"]> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const userPrompt = buildSimilarUserPrompt(args, attempt);
+      let full = "";
+      for await (const chunk of args.llm.stream({
+        systemPrompt: SIMILAR_SYSTEM_PROMPT,
+        userPrompt,
+        temperature: 0.85,
+        maxTokens: 512,
+      })) {
+        if (chunk.type === "text_delta") {
+          full += chunk.text;
+          args.onDelta(chunk.text);
+        } else if (chunk.type === "done") {
+          full = chunk.fullText || full;
+        }
+      }
+      const raw = extractJson(full);
+      const parsed = JSON.parse(raw);
+      return NamerSimilarOutputSchema.parse(parsed).candidate;
     } catch (err) {
       lastErr = err;
     }

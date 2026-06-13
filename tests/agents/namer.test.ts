@@ -51,3 +51,67 @@ describe("runNamer", () => {
     expect(deltas.join("")).toBe(json);
   });
 });
+
+import { runNamerSimilar } from "@/lib/agents/namer";
+
+function llmThatReturnsSingle(payload: string) {
+  const recorder: { lastUserPrompt?: string } = {};
+  const llm = {
+    name: "gemini" as const,
+    async *stream(opts: { userPrompt: string }) {
+      recorder.lastUserPrompt = opts.userPrompt;
+      yield { type: "text_delta" as const, text: payload };
+      yield { type: "done" as const, fullText: payload };
+    },
+  };
+  Object.defineProperty(llm, "lastUserPrompt", {
+    get() { return recorder.lastUserPrompt; },
+    enumerable: true,
+  });
+  return llm as typeof llm & { readonly lastUserPrompt: string | undefined };
+}
+
+describe("runNamerSimilar", () => {
+  it("returns a single name with reasoning", async () => {
+    const payload = JSON.stringify({ candidate: { name: "Pebbl", reasoning: "a softer variant" } });
+    const llm = llmThatReturnsSingle(payload);
+    const result = await runNamerSimilar({
+      brief: "a meditation app",
+      similarTo: { name: "Pebble", failedChecks: ["domain"] },
+      avoid: ["Pebble"],
+      llm,
+      onDelta: () => {},
+    });
+    expect(result.name).toBe("Pebbl");
+    expect(result.reasoning).toBe("a softer variant");
+  });
+
+  it("includes the rejected name and failed checks in the user prompt", async () => {
+    const payload = JSON.stringify({ candidate: { name: "Mosaicy", reasoning: "x" } });
+    const llm = llmThatReturnsSingle(payload);
+    await runNamerSimilar({
+      brief: "tiling startup",
+      similarTo: { name: "Mosaic", failedChecks: ["trademark", "domain"] },
+      avoid: ["Mosaic"],
+      llm,
+      onDelta: () => {},
+    });
+    expect(llm.lastUserPrompt).toContain("Mosaic");
+    expect(llm.lastUserPrompt).toContain("trademark");
+    expect(llm.lastUserPrompt).toContain("domain");
+  });
+
+  it("includes the avoid list in the user prompt", async () => {
+    const payload = JSON.stringify({ candidate: { name: "Brick", reasoning: "x" } });
+    const llm = llmThatReturnsSingle(payload);
+    await runNamerSimilar({
+      brief: "tiling startup",
+      similarTo: { name: "Mosaic", failedChecks: ["trademark"] },
+      avoid: ["Mosaic", "Mosaick", "Mosaiq"],
+      llm,
+      onDelta: () => {},
+    });
+    expect(llm.lastUserPrompt).toContain("Mosaick");
+    expect(llm.lastUserPrompt).toContain("Mosaiq");
+  });
+});
