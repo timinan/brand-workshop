@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { clampedString } from "@/lib/clamp-string";
 
 export const VerdictSchema = z.enum(["pass", "warn", "fail"]);
 export type Verdict = z.infer<typeof VerdictSchema>;
@@ -72,16 +73,16 @@ export const CopywriterOutputSchema = z.object({
 export type CopywriterOutput = z.infer<typeof CopywriterOutputSchema>;
 
 export const CompetitorSchema = z.object({
-  name: z.string().min(1),
+  name: clampedString(80),
   url: z.string().url(),
-  differentiator: z.string().min(1),
+  differentiator: clampedString(160),
 });
 
 export const StrategistOutputSchema = z.object({
-  positioning: z.string().min(1).max(400),
+  positioning: clampedString(400),
   competitors: z.array(CompetitorSchema).min(2).max(3),
-  differentiation: z.string().min(1).max(280),
-  risk: z.string().min(1).max(280),
+  differentiation: clampedString(280),
+  risk: clampedString(280),
 });
 export type StrategistOutput = z.infer<typeof StrategistOutputSchema>;
 

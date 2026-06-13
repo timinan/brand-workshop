@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { getLLMProvider, getSearchProvider, getImageProvider } from "@/lib/providers/factory";
-import { runWorkshop } from "@/lib/orchestrator/workshop";
+import { getLLMProvider, getSearchProvider } from "@/lib/providers/factory";
+import { runBrandScoutPhase } from "@/lib/orchestrator/workshop";
 import { encodeSseEvent } from "@/lib/orchestrator/sse";
 import type { WorkshopEvent } from "@/lib/events/types";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -19,25 +19,29 @@ export async function POST(req: NextRequest) {
   }
   await recordRunCost();
 
-  const body = (await req.json().catch(() => ({}))) as { brief?: string };
+  const body = (await req.json().catch(() => ({}))) as { brief?: string; chosenName?: string };
   const brief = (body.brief ?? "").trim();
+  const chosenName = (body.chosenName ?? "").trim();
   if (!brief || brief.length < 4 || brief.length > 280) {
     return new Response("Brief must be between 4 and 280 characters.", { status: 400 });
+  }
+  if (!chosenName || chosenName.length > 60 || /\n/.test(chosenName)) {
+    return new Response("chosenName must be 1-60 characters, no newlines.", { status: 400 });
   }
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit = (event: WorkshopEvent) => controller.enqueue(encodeSseEvent(event));
       try {
-        await runWorkshop({
+        await runBrandScoutPhase({
           brief,
+          chosenName,
           getLlm: getLLMProvider,
           getSearch: getSearchProvider,
-          getImage: getImageProvider,
           emit,
         });
       } catch (err) {
-        emit({ type: "workshop_error", error: err instanceof Error ? err.message : String(err) });
+        if (!(err instanceof Error)) emit({ type: "workshop_error", error: String(err) });
       } finally {
         controller.close();
       }

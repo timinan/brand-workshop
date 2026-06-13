@@ -10,6 +10,7 @@ import {
 
 export interface SynthesizeArgs {
   brief: string;
+  chosenName: string;
   namer: NamerOutput;
   brandScout: BrandScoutOutput;
   designer: DesignerOutput;
@@ -17,30 +18,16 @@ export interface SynthesizeArgs {
   strategist: StrategistOutput;
 }
 
-function reasonForAutoSwap(scout: BrandScoutOutput): string {
-  const fails = (Object.entries(scout.scorecard) as [string, "pass" | "warn" | "fail"][])
-    .filter(([, v]) => v === "fail")
-    .map(([k]) => k);
-  if (fails.length > 0) return `${fails.join(", ")} verdict failed`;
-  const firstFinding = scout.findings[0];
-  return firstFinding ? firstFinding.finding : "brand-scout chose to swap";
-}
-
 export function synthesizeBrandKit(args: SynthesizeArgs): BrandKit {
-  const vettedName = args.brandScout.vettedName;
-  const swapped = vettedName !== args.namer.top_pick;
-
   const kit: BrandKit = {
     brief: args.brief,
-    name: vettedName,
-    autoSwapped: swapped
-      ? { from: args.namer.top_pick, to: vettedName, reason: reasonForAutoSwap(args.brandScout) }
-      : null,
+    name: args.chosenName,
+    autoSwapped: null,
     namesConsidered: args.namer.candidates.map((c) => ({
       name: c.name,
       reasoning: c.reasoning,
-      rejected: c.name !== vettedName,
-      reason: c.name !== vettedName ? (swapped && c.name === args.namer.top_pick ? "rejected by Brand Scout" : "not top pick") : null,
+      rejected: c.name !== args.chosenName,
+      reason: c.name !== args.chosenName ? "not chosen" : null,
     })),
     logos: args.designer.concepts,
     taglines: args.copywriter.taglines,

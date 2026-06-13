@@ -29,8 +29,6 @@ function summary(ev: AgentRuntimeEvent): string {
       return p.query.length > 60 ? p.query.slice(0, 60) + "…" : p.query;
     case "image_generated":
       return `image ${p.conceptIndex + 1}`;
-    case "auto_swap":
-      return `→ ${p.to}`;
     case "workshop_error":
       return p.error.length > 60 ? p.error.slice(0, 60) + "…" : p.error;
     default:

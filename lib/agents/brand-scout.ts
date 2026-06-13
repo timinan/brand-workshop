@@ -1,6 +1,6 @@
 import type { LLMProvider, SearchProvider, SearchResult } from "@/lib/providers/types";
 import { BrandScoutOutputSchema, type BrandScoutOutput } from "./types";
-import { extractJson } from "./namer";
+import { parseLlmJson } from "@/lib/parse-llm-json";
 
 const SYSTEM_PROMPT = `You are a brand safety analyst. Given a candidate brand name, a brief, and web search findings, produce a Brand Safety Scorecard.
 
@@ -83,7 +83,7 @@ Produce the scorecard JSON.`;
     }
   }
 
-  const parsed = BrandScoutOutputSchema.parse(JSON.parse(extractJson(full)));
+  const parsed = BrandScoutOutputSchema.parse(parseLlmJson(full));
 
   // Enforce: any "fail" verdict overrides recommendation to swap_to_next.
   const hasFail = Object.values(parsed.scorecard).includes("fail");

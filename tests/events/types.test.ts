@@ -14,12 +14,6 @@ describe("WorkshopEvent", () => {
     ).toBe(true);
   });
 
-  it("accepts auto_swap", () => {
-    expect(
-      WorkshopEventSchema.safeParse({ type: "auto_swap", from: "Acme", to: "Pebble", reason: "trademark conflict" }).success,
-    ).toBe(true);
-  });
-
   it("rejects unknown event types", () => {
     expect(WorkshopEventSchema.safeParse({ type: "made_up" }).success).toBe(false);
   });

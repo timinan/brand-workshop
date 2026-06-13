@@ -45,6 +45,26 @@ describe("CloudflareLLMProvider", () => {
     ]);
   });
 
+  it("requests json_object format when responseSchema is set", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      body: sseBody([
+        `data: ${JSON.stringify({ choices: [{ delta: { content: "{}" } }] })}\n\n`,
+        `data: [DONE]\n\n`,
+      ]),
+    });
+
+    const provider = new CloudflareLLMProvider({ accountId: "acc", apiToken: "tok" });
+    for await (const _ of provider.stream({
+      systemPrompt: "s",
+      userPrompt: "u",
+      responseSchema: { type: "object" },
+    })) { /* drain */ }
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.response_format).toEqual({ type: "json_object" });
+  });
+
   it("emits a single tool_use when a web_search call streams across chunks", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,

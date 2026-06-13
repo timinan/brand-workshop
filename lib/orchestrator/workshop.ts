@@ -6,20 +6,25 @@ import { runDesigner } from "@/lib/agents/designer";
 import { runCopywriter } from "@/lib/agents/copywriter";
 import { runStrategist } from "@/lib/agents/strategist";
 import { synthesizeBrandKit } from "@/lib/agents/director";
-import type { BrandScoutOutput, NamerOutput } from "@/lib/agents/types";
+import type {
+  BrandKit,
+  BrandScoutOutput,
+  NamerOutput,
+} from "@/lib/agents/types";
 
-export interface WorkshopArgs {
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+export interface NamerPhaseArgs {
   brief: string;
+  avoid?: string[];
   getLlm: () => LLMProvider;
-  getSearch: () => SearchProvider;
-  getImage: () => ImageProvider;
   emit: (event: WorkshopEvent) => void;
 }
 
-const MAX_SCOUT_ATTEMPTS = 3;
-
-export async function runWorkshop(args: WorkshopArgs): Promise<void> {
-  const { brief, getLlm, getSearch, getImage, emit } = args;
+export async function runNamerPhase(args: NamerPhaseArgs): Promise<NamerOutput> {
+  const { brief, avoid, getLlm, emit } = args;
   emit({ type: "workshop_started", brief });
 
   let llm: LLMProvider;
@@ -27,92 +32,78 @@ export async function runWorkshop(args: WorkshopArgs): Promise<void> {
     llm = getLlm();
   } catch (err) {
     emit({ type: "workshop_error", error: errorMessage(err) });
-    return;
+    throw err;
   }
 
-  // Stage 1: Namer
-  let namer: NamerOutput;
   emit({ type: "agent_started", agent: "namer" });
   try {
-    namer = await runNamer({
-      brief, llm,
+    const namer = await runNamer({
+      brief,
+      llm,
+      avoid,
       onDelta: (delta) => emit({ type: "agent_streaming", agent: "namer", delta }),
     });
     emit({ type: "agent_completed", agent: "namer", output: namer });
+    return namer;
   } catch (err) {
     emit({ type: "workshop_error", agent: "namer", error: errorMessage(err) });
-    return; // Fatal — nothing downstream is possible.
+    throw err;
   }
+}
 
-  // Stage 2: Brand Scout, up to 3 attempts with auto-swap.
-  let scout: BrandScoutOutput | null = null;
-  let chosenName = namer.top_pick;
-  const tried: string[] = [];
+export interface BrandScoutPhaseArgs {
+  brief: string;
+  chosenName: string;
+  getLlm: () => LLMProvider;
+  getSearch: () => SearchProvider;
+  emit: (event: WorkshopEvent) => void;
+}
 
-  for (let attempt = 0; attempt < MAX_SCOUT_ATTEMPTS && attempt < namer.candidates.length; attempt++) {
-    tried.push(chosenName);
-    emit({ type: "agent_started", agent: "brand-scout" });
-    try {
-      const search = getSearch();
-      const result = await runBrandScout({
-        name: chosenName, brief, llm, search,
-        onDelta: (delta) => emit({ type: "agent_streaming", agent: "brand-scout", delta }),
-        onSearch: (query) => emit({ type: "agent_tool_use", agent: "brand-scout", tool: "web_search", query }),
-      });
-
-      if (result.recommendation === "swap_to_next") {
-        const nextCandidate = namer.candidates.find((c) => !tried.includes(c.name));
-        if (!nextCandidate) {
-          // All candidates failed: use the original top pick and surface findings.
-          scout = { ...result, vettedName: namer.top_pick, recommendation: "proceed_with_warning" };
-          emit({ type: "agent_completed", agent: "brand-scout", output: scout });
-          break;
-        }
-        emit({
-          type: "auto_swap",
-          from: chosenName,
-          to: nextCandidate.name,
-          reason: result.findings[0]?.finding ?? "scorecard failure",
-        });
-        chosenName = nextCandidate.name;
-        continue;
-      }
-
-      scout = result;
-      emit({ type: "agent_completed", agent: "brand-scout", output: scout });
-      break;
-    } catch (err) {
-      // Search/LLM failure: keep going with original name + warning.
-      scout = {
-        scorecard: { existingCompany: "warn", domain: "warn", trademark: "warn", connotations: "warn" },
-        findings: [{ category: "system", finding: `Brand Scout unavailable: ${errorMessage(err)}` }],
-        recommendation: "proceed_with_warning",
-        vettedName: namer.top_pick,
-      };
-      emit({ type: "agent_completed", agent: "brand-scout", output: scout });
-      break;
-    }
+export async function runBrandScoutPhase(args: BrandScoutPhaseArgs): Promise<BrandScoutOutput> {
+  const { brief, chosenName, getLlm, getSearch, emit } = args;
+  emit({ type: "agent_started", agent: "brand-scout" });
+  try {
+    const llm = getLlm();
+    const search = getSearch();
+    const result = await runBrandScout({
+      name: chosenName,
+      brief,
+      llm,
+      search,
+      onDelta: (delta) => emit({ type: "agent_streaming", agent: "brand-scout", delta }),
+      onSearch: (query) => emit({ type: "agent_tool_use", agent: "brand-scout", tool: "web_search", query }),
+    });
+    const output: BrandScoutOutput = { ...result, vettedName: chosenName };
+    emit({ type: "agent_completed", agent: "brand-scout", output });
+    return output;
+  } catch (err) {
+    emit({ type: "workshop_error", agent: "brand-scout", error: errorMessage(err) });
+    throw err;
   }
+}
 
-  if (!scout) {
-    // Loop exited without setting scout (shouldn't happen but safety net).
-    scout = {
-      scorecard: { existingCompany: "warn", domain: "warn", trademark: "warn", connotations: "warn" },
-      findings: [{ category: "system", finding: "Brand Scout produced no result" }],
-      recommendation: "proceed_with_warning",
-      vettedName: namer.top_pick,
-    };
-  }
+export interface FinishPhaseArgs {
+  brief: string;
+  chosenName: string;
+  namerOutput: NamerOutput;
+  brandScoutOutput: BrandScoutOutput;
+  getLlm: () => LLMProvider;
+  getSearch: () => SearchProvider;
+  getImage: () => ImageProvider;
+  emit: (event: WorkshopEvent) => void;
+}
 
-  const vettedName = scout.vettedName;
+export async function runFinishPhase(args: FinishPhaseArgs): Promise<BrandKit> {
+  const { brief, chosenName, namerOutput, brandScoutOutput, getLlm, getSearch, getImage, emit } = args;
 
-  // Stage 3: parallel Designer + Copywriter + Strategist
   const designerPromise = (async () => {
     emit({ type: "agent_started", agent: "designer" });
     try {
       const image = getImage();
       const out = await runDesigner({
-        name: vettedName, brief, image,
+        name: chosenName,
+        brief,
+        image,
         onImage: (i, url) => emit({ type: "image_generated", conceptIndex: i, url }),
       });
       emit({ type: "agent_completed", agent: "designer", output: out });
@@ -126,8 +117,11 @@ export async function runWorkshop(args: WorkshopArgs): Promise<void> {
   const copyPromise = (async () => {
     emit({ type: "agent_started", agent: "copywriter" });
     try {
+      const llm = getLlm();
       const out = await runCopywriter({
-        name: vettedName, brief, llm,
+        name: chosenName,
+        brief,
+        llm,
         onDelta: (delta) => emit({ type: "agent_streaming", agent: "copywriter", delta }),
       });
       emit({ type: "agent_completed", agent: "copywriter", output: out });
@@ -141,9 +135,13 @@ export async function runWorkshop(args: WorkshopArgs): Promise<void> {
   const strategistPromise = (async () => {
     emit({ type: "agent_started", agent: "strategist" });
     try {
+      const llm = getLlm();
       const search = getSearch();
       const out = await runStrategist({
-        name: vettedName, brief, llm, search,
+        name: chosenName,
+        brief,
+        llm,
+        search,
         onDelta: (delta) => emit({ type: "agent_streaming", agent: "strategist", delta }),
         onSearch: (query) => emit({ type: "agent_tool_use", agent: "strategist", tool: "web_search", query }),
       });
@@ -157,11 +155,16 @@ export async function runWorkshop(args: WorkshopArgs): Promise<void> {
 
   const [designer, copywriter, strategist] = await Promise.all([designerPromise, copyPromise, strategistPromise]);
 
-  // Stage 4: Director (deterministic) — no agent_started/agent_completed; signal is brand_kit_ready.
-  const brandKit = synthesizeBrandKit({ brief, namer, brandScout: scout, designer, copywriter, strategist });
+  const brandKit = synthesizeBrandKit({
+    brief,
+    chosenName,
+    namer: namerOutput,
+    brandScout: brandScoutOutput,
+    designer,
+    copywriter,
+    strategist,
+  });
   emit({ type: "brand_kit_ready", brandKit });
+  return brandKit;
 }
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}

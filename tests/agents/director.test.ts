@@ -41,19 +41,20 @@ const strategist = {
 };
 
 describe("synthesizeBrandKit", () => {
-  it("uses the vettedName from brandScout", () => {
-    const kit = synthesizeBrandKit({ brief: "x", namer, brandScout, designer, copywriter, strategist });
-    expect(kit.name).toBe("Pebble");
+  it("uses chosenName for kit.name", () => {
+    const kit = synthesizeBrandKit({ brief: "x", chosenName: "Mosaic", namer, brandScout, designer, copywriter, strategist });
+    expect(kit.name).toBe("Mosaic");
   });
 
-  it("populates autoSwapped when vettedName differs from top_pick", () => {
-    const kit = synthesizeBrandKit({ brief: "x", namer, brandScout, designer, copywriter, strategist });
-    expect(kit.autoSwapped).toEqual({ from: "Acme", to: "Pebble", reason: expect.any(String) });
+  it("always sets autoSwapped to null", () => {
+    const kit = synthesizeBrandKit({ brief: "x", chosenName: "Acme", namer, brandScout, designer, copywriter, strategist });
+    expect(kit.autoSwapped).toBeNull();
   });
 
-  it("marks non-vetted candidates as rejected", () => {
-    const kit = synthesizeBrandKit({ brief: "x", namer, brandScout, designer, copywriter, strategist });
-    expect(kit.namesConsidered.find((n) => n.name === "Acme")?.rejected).toBe(true);
+  it("marks candidates other than chosenName as rejected with reason 'not chosen'", () => {
+    const kit = synthesizeBrandKit({ brief: "x", chosenName: "Pebble", namer, brandScout, designer, copywriter, strategist });
     expect(kit.namesConsidered.find((n) => n.name === "Pebble")?.rejected).toBe(false);
+    expect(kit.namesConsidered.find((n) => n.name === "Acme")?.rejected).toBe(true);
+    expect(kit.namesConsidered.find((n) => n.name === "Acme")?.reason).toBe("not chosen");
   });
 });

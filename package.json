@@ -15,10 +15,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
-    "@google/generative-ai": "^0.21.0",
     "@fal-ai/serverless-client": "^0.15.0",
+    "@google/generative-ai": "^0.21.0",
     "@vercel/kv": "^3.0.0",
     "html-to-image": "^1.11.13",
+    "jsonrepair": "^3.14.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
