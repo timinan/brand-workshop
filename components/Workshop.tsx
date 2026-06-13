@@ -60,6 +60,12 @@ function targetAgent(event: WorkshopEvent): AgentName | null {
     case "workshop_started":
     case "brand_kit_ready":
       return null;
+    case "suggest_attempt_started":
+    case "suggest_attempt_named":
+    case "suggest_attempt_vetted":
+    case "suggest_success":
+    case "suggest_exhausted":
+      return null;
   }
 }
 
@@ -73,6 +79,9 @@ export default function Workshop() {
   const [brandKit, setBrandKit] = useState<BrandKitData | null>(null);
   const [workshopError, setWorkshopError] = useState<string | null>(null);
   const [avoidNames, setAvoidNames] = useState<string[]>([]);
+  const [suggestInFlight, setSuggestInFlight] = useState(false);
+  const [suggestAttempt, setSuggestAttempt] = useState<number | undefined>(undefined);
+  const [suggestExhausted, setSuggestExhausted] = useState(false);
   const debug = useSearchParams()?.get("debug") === "1";
 
   function reset() {
@@ -84,6 +93,9 @@ export default function Workshop() {
     setBrandKit(null);
     setWorkshopError(null);
     setAvoidNames([]);
+    setSuggestInFlight(false);
+    setSuggestAttempt(undefined);
+    setSuggestExhausted(false);
   }
 
   function applyEvent(event: WorkshopEvent) {
@@ -262,7 +274,79 @@ export default function Workshop() {
     setChosenName(null);
     setBrandScoutOutput(null);
     setAgents((prev) => ({ ...prev, "brand-scout": { ...INITIAL_AGENT } }));
+    setSuggestInFlight(false);
+    setSuggestAttempt(undefined);
+    setSuggestExhausted(false);
     setPhase("picking");
+  }
+
+  async function runSuggestSimilar() {
+    if (!brandScoutOutput || !chosenName) return;
+    setSuggestInFlight(true);
+    setSuggestAttempt(1);
+    setSuggestExhausted(false);
+
+    try {
+      const res = await fetch("/api/workshop/suggest-similar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brief,
+          rejectedName: chosenName,
+          scorecard: brandScoutOutput.scorecard,
+          findings: brandScoutOutput.findings,
+          avoid: [...avoidNames, chosenName],
+        }),
+      });
+      if (!res.ok || !res.body) {
+        setSuggestInFlight(false);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
+        for (const frame of frames) {
+          const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
+          if (!dataLine) continue;
+          const event = JSON.parse(dataLine.slice(6)) as WorkshopEvent;
+          if (event.type === "suggest_attempt_started") {
+            setSuggestAttempt(event.attempt);
+          } else if (event.type === "suggest_success") {
+            setChosenName(event.name);
+            setBrandScoutOutput({
+              scorecard: event.scorecard,
+              findings: event.findings,
+              recommendation: "proceed",
+              vettedName: event.name,
+            });
+            setAvoidNames((prev) => [...prev, ...event.avoidedDuringRun, event.name]);
+            setSuggestExhausted(false);
+          } else if (event.type === "suggest_exhausted") {
+            setChosenName(event.name);
+            setBrandScoutOutput({
+              scorecard: event.scorecard,
+              findings: event.findings,
+              recommendation: "swap_to_next",
+              vettedName: event.name,
+            });
+            setAvoidNames((prev) => [...prev, ...event.avoidedDuringRun, event.name]);
+            setSuggestExhausted(true);
+          } else if (event.type === "workshop_error") {
+            setSuggestInFlight(false);
+            return;
+          }
+        }
+      }
+    } finally {
+      setSuggestInFlight(false);
+      setSuggestAttempt(undefined);
+    }
   }
 
   const isBusy = phase === "naming" || phase === "vetting" || phase === "building";
@@ -309,6 +393,10 @@ export default function Workshop() {
           onConfirm={runFinishing}
           onPickAgain={pickAgain}
           disabled={isBusy}
+          onSuggestSimilar={runSuggestSimilar}
+          suggestInFlight={suggestInFlight}
+          suggestAttempt={suggestAttempt}
+          suggestExhausted={suggestExhausted}
         />
       )}
 

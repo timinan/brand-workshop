@@ -6,7 +6,11 @@ interface Props {
   brandScout: BrandScoutOutput;
   onConfirm: () => void;
   onPickAgain: () => void;
+  onSuggestSimilar: () => void;
   disabled?: boolean;
+  suggestInFlight?: boolean;
+  suggestAttempt?: number;
+  suggestExhausted?: boolean;
 }
 
 const VERDICT_CLASSES = {
@@ -15,9 +19,21 @@ const VERDICT_CLASSES = {
   fail: "border border-red-700 text-red-700",
 } as const;
 const VERDICT_LABEL = { pass: "Pass", warn: "Warn", fail: "Fail" } as const;
+const MAX_ATTEMPTS = 3;
 
-export default function ScoutConfirm({ chosenName, brandScout, onConfirm, onPickAgain, disabled = false }: Props) {
+export default function ScoutConfirm({
+  chosenName,
+  brandScout,
+  onConfirm,
+  onPickAgain,
+  onSuggestSimilar,
+  disabled = false,
+  suggestInFlight = false,
+  suggestAttempt,
+  suggestExhausted = false,
+}: Props) {
   const hasFail = Object.values(brandScout.scorecard).includes("fail");
+  const buttonsDisabled = disabled || suggestInFlight;
 
   return (
     <section
@@ -49,16 +65,27 @@ export default function ScoutConfirm({ chosenName, brandScout, onConfirm, onPick
         <button
           type="button"
           onClick={onConfirm}
-          disabled={disabled}
+          disabled={buttonsDisabled}
           className="rounded bg-[#c2410c] px-4 py-2 text-sm font-medium text-white hover:bg-[#9a3412] disabled:opacity-50 transition-colors duration-200"
           data-testid="confirm-name"
         >
           Use this name
         </button>
+        {hasFail && (
+          <button
+            type="button"
+            onClick={onSuggestSimilar}
+            disabled={buttonsDisabled}
+            className="rounded border border-[#c2410c] px-4 py-2 text-sm text-[#c2410c] hover:bg-[#fff7ed] disabled:opacity-50 transition-colors duration-200"
+            data-testid="suggest-similar"
+          >
+            Suggest similar
+          </button>
+        )}
         <button
           type="button"
           onClick={onPickAgain}
-          disabled={disabled}
+          disabled={buttonsDisabled}
           className="rounded border border-stone-300 px-4 py-2 text-sm text-stone-800 hover:bg-stone-50 disabled:opacity-50 transition-colors duration-200"
           data-testid="pick-again"
         >
@@ -66,7 +93,19 @@ export default function ScoutConfirm({ chosenName, brandScout, onConfirm, onPick
         </button>
       </div>
 
-      {hasFail && (
+      {suggestInFlight && (
+        <p data-testid="suggest-progress" className="text-xs text-stone-700">
+          Trying alternative... attempt {suggestAttempt ?? 1} of {MAX_ATTEMPTS}
+        </p>
+      )}
+
+      {!suggestInFlight && suggestExhausted && (
+        <p data-testid="suggest-exhausted" className="text-xs text-red-700 underline">
+          No similar name passed in {MAX_ATTEMPTS} tries. Consider picking a different name.
+        </p>
+      )}
+
+      {!suggestInFlight && !suggestExhausted && hasFail && (
         <p className="text-xs text-red-700 underline">
           This name has a serious issue — consider picking again.
         </p>

@@ -115,3 +115,11 @@ export const BrandKitSchema = z.object({
   findings: z.array(FindingSchema),
 });
 export type BrandKit = z.infer<typeof BrandKitSchema>;
+
+export const NamerSimilarOutputSchema = z.object({
+  candidate: z.object({
+    name: z.string().min(1).max(24),
+    reasoning: z.string().min(1).max(200),
+  }),
+});
+export type NamerSimilarOutput = z.infer<typeof NamerSimilarOutputSchema>;
