@@ -230,7 +230,7 @@ export async function runSuggestSimilarPhase(args: SuggestSimilarPhaseArgs): Pro
 
     emit({ type: "suggest_attempt_named", attempt, name: candidate.name });
 
-    let scout: import("@/lib/agents/types").BrandScoutOutput;
+    let scout: BrandScoutOutput;
     try {
       scout = await runBrandScout({
         name: candidate.name,
