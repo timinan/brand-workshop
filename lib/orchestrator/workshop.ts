@@ -1,7 +1,9 @@
 import type { LLMProvider, SearchProvider, ImageProvider } from "@/lib/providers/types";
 import type { WorkshopEvent } from "@/lib/events/types";
-import { runNamer } from "@/lib/agents/namer";
+import { runNamer, runNamerSimilar } from "@/lib/agents/namer";
 import { runBrandScout } from "@/lib/agents/brand-scout";
+import { ScorecardSchema, FindingSchema } from "@/lib/agents/types";
+import type { z } from "zod";
 import { runDesigner } from "@/lib/agents/designer";
 import { runCopywriter } from "@/lib/agents/copywriter";
 import { runStrategist } from "@/lib/agents/strategist";
@@ -168,3 +170,122 @@ export async function runFinishPhase(args: FinishPhaseArgs): Promise<BrandKit> {
   return brandKit;
 }
 
+export interface SuggestSimilarPhaseArgs {
+  brief: string;
+  rejectedName: string;
+  rejectedScorecard: z.infer<typeof ScorecardSchema>;
+  rejectedFindings: z.infer<typeof FindingSchema>[];
+  avoid: string[];
+  getLlm: () => LLMProvider;
+  getSearch: () => SearchProvider;
+  emit: (event: WorkshopEvent) => void;
+}
+
+const MAX_ATTEMPTS = 3;
+
+function failedChecksFromScorecard(scorecard: Record<string, string>): string[] {
+  return Object.entries(scorecard).filter(([, v]) => v === "fail").map(([k]) => k);
+}
+
+export async function runSuggestSimilarPhase(args: SuggestSimilarPhaseArgs): Promise<void> {
+  const { brief, rejectedName, rejectedScorecard, getLlm, getSearch, emit } = args;
+  const runAvoid: string[] = [...args.avoid];
+  const avoidedDuringRun: string[] = [];
+  let lastFailedChecks = failedChecksFromScorecard(rejectedScorecard as unknown as Record<string, string>);
+  let lastSimilarTo = rejectedName;
+
+  let lastAttempt: {
+    name: string;
+    scorecard: z.infer<typeof ScorecardSchema>;
+    findings: z.infer<typeof FindingSchema>[];
+    reasoning: string;
+  } | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    emit({ type: "suggest_attempt_started", attempt });
+
+    let llm: LLMProvider;
+    let search: SearchProvider;
+    try {
+      llm = getLlm();
+      search = getSearch();
+    } catch (err) {
+      emit({ type: "workshop_error", error: errorMessage(err) });
+      throw err;
+    }
+
+    let candidate: { name: string; reasoning: string };
+    try {
+      candidate = await runNamerSimilar({
+        brief,
+        similarTo: { name: lastSimilarTo, failedChecks: lastFailedChecks },
+        avoid: runAvoid,
+        llm,
+        onDelta: (delta) => emit({ type: "agent_streaming", agent: "namer", delta }),
+      });
+    } catch (err) {
+      emit({ type: "workshop_error", agent: "namer", error: errorMessage(err) });
+      throw err;
+    }
+
+    emit({ type: "suggest_attempt_named", attempt, name: candidate.name });
+
+    let scout: import("@/lib/agents/types").BrandScoutOutput;
+    try {
+      scout = await runBrandScout({
+        name: candidate.name,
+        brief,
+        llm,
+        search,
+        onDelta: (delta) => emit({ type: "agent_streaming", agent: "brand-scout", delta }),
+        onSearch: (query) => emit({ type: "agent_tool_use", agent: "brand-scout", tool: "web_search", query }),
+      });
+    } catch (err) {
+      emit({ type: "workshop_error", agent: "brand-scout", error: errorMessage(err) });
+      throw err;
+    }
+
+    emit({ type: "suggest_attempt_vetted", attempt, scorecard: scout.scorecard });
+
+    lastAttempt = {
+      name: candidate.name,
+      scorecard: scout.scorecard,
+      findings: scout.findings,
+      reasoning: candidate.reasoning,
+    };
+
+    const hasFail = Object.values(scout.scorecard).includes("fail");
+    if (!hasFail) {
+      emit({
+        type: "suggest_success",
+        name: candidate.name,
+        scorecard: scout.scorecard,
+        findings: scout.findings,
+        reasoning: candidate.reasoning,
+        avoidedDuringRun,
+      });
+      return;
+    }
+
+    // Failed this attempt — accumulate for next loop iteration
+    avoidedDuringRun.push(candidate.name);
+    runAvoid.push(candidate.name);
+    lastFailedChecks = failedChecksFromScorecard(scout.scorecard as unknown as Record<string, string>);
+    lastSimilarTo = candidate.name;
+  }
+
+  // Exhausted: surface the LAST attempt's name + scorecard
+  // avoidedDuringRun contains all 3 failed names at this point.
+  // The exhausted event should report the last name as `name`, and
+  // avoidedDuringRun should be the first N-1 failed names (not the surfaced one).
+  if (lastAttempt) {
+    emit({
+      type: "suggest_exhausted",
+      name: lastAttempt.name,
+      scorecard: lastAttempt.scorecard,
+      findings: lastAttempt.findings,
+      reasoning: lastAttempt.reasoning,
+      avoidedDuringRun: avoidedDuringRun.slice(0, -1),
+    });
+  }
+}

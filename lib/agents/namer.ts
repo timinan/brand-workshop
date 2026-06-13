@@ -145,8 +145,7 @@ export async function runNamerSimilar(args: NamerSimilarArgs): Promise<NamerSimi
           full = chunk.fullText || full;
         }
       }
-      const raw = extractJson(full);
-      const parsed = JSON.parse(raw);
+      const parsed = parseLlmJson(full);
       return NamerSimilarOutputSchema.parse(parsed).candidate;
     } catch (err) {
       lastErr = err;

@@ -3,6 +3,7 @@ import {
   runNamerPhase,
   runBrandScoutPhase,
   runFinishPhase,
+  runSuggestSimilarPhase,
 } from "@/lib/orchestrator/workshop";
 import type { LLMProvider, LLMChunk, SearchProvider, ImageProvider } from "@/lib/providers/types";
 import type { WorkshopEvent } from "@/lib/events/types";
@@ -162,5 +163,118 @@ describe("runFinishPhase", () => {
     const considered = kit.namesConsidered;
     expect(considered.find((c) => c.name === "Mosaic")?.rejected).toBe(false);
     expect(considered.find((c) => c.name === "Pebble")?.rejected).toBe(true);
+  });
+});
+
+const passScorecardJson = (name: string) => JSON.stringify({
+  scorecard: { existingCompany: "pass", domain: "pass", trademark: "pass", connotations: "pass" },
+  findings: [],
+  recommendation: "proceed",
+  vettedName: name,
+});
+
+const failScorecardJson = (name: string, failOn: "existingCompany" | "domain" | "trademark" | "connotations" = "domain") => {
+  const sc: Record<string, "pass" | "fail"> = { existingCompany: "pass", domain: "pass", trademark: "pass", connotations: "pass" };
+  sc[failOn] = "fail";
+  return JSON.stringify({
+    scorecard: sc,
+    findings: [{ category: failOn, finding: `${failOn} issue with ${name}` }],
+    recommendation: "swap_to_next",
+    vettedName: name,
+  });
+};
+
+const similarCandidateJson = (name: string, reasoning = "softer variant") =>
+  JSON.stringify({ candidate: { name, reasoning } });
+
+describe("runSuggestSimilarPhase", () => {
+  it("passes on attempt 1: emits one attempt cycle + suggest_success", async () => {
+    const llm = llmThatReturns(
+      similarCandidateJson("Pebbl"),     // Namer call 1
+      passScorecardJson("Pebbl"),         // BrandScout call 1
+    );
+    const events: WorkshopEvent[] = [];
+    await runSuggestSimilarPhase({
+      brief: "a meditation app",
+      rejectedName: "Pebble",
+      rejectedScorecard: { existingCompany: "pass", domain: "fail", trademark: "pass", connotations: "pass" },
+      rejectedFindings: [{ category: "domain", finding: "pebble.com taken" }],
+      avoid: ["Pebble"],
+      getLlm: () => llm,
+      getSearch: () => search,
+      emit: (e) => events.push(e),
+    });
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain("suggest_attempt_started");
+    expect(types).toContain("suggest_attempt_named");
+    expect(types).toContain("suggest_attempt_vetted");
+    expect(types).toContain("suggest_success");
+    expect(types).not.toContain("suggest_exhausted");
+
+    const success = events.find((e) => e.type === "suggest_success");
+    expect(success).toBeDefined();
+    if (success?.type === "suggest_success") {
+      expect(success.name).toBe("Pebbl");
+      expect(success.avoidedDuringRun).toEqual([]); // no failed attempts before success
+    }
+  });
+
+  it("passes on attempt 3: emits three attempt cycles + suggest_success", async () => {
+    const llm = llmThatReturns(
+      similarCandidateJson("Pebbl"),       // Namer 1
+      failScorecardJson("Pebbl", "domain"),// Scout 1 — fail
+      similarCandidateJson("Pebbly"),      // Namer 2
+      failScorecardJson("Pebbly", "trademark"), // Scout 2 — fail
+      similarCandidateJson("Cobbl"),       // Namer 3
+      passScorecardJson("Cobbl"),          // Scout 3 — pass
+    );
+    const events: WorkshopEvent[] = [];
+    await runSuggestSimilarPhase({
+      brief: "a meditation app",
+      rejectedName: "Pebble",
+      rejectedScorecard: { existingCompany: "pass", domain: "fail", trademark: "pass", connotations: "pass" },
+      rejectedFindings: [],
+      avoid: ["Pebble"],
+      getLlm: () => llm,
+      getSearch: () => search,
+      emit: (e) => events.push(e),
+    });
+
+    const startedAttempts = events.filter((e) => e.type === "suggest_attempt_started");
+    expect(startedAttempts).toHaveLength(3);
+    const success = events.find((e) => e.type === "suggest_success");
+    if (success?.type === "suggest_success") {
+      expect(success.name).toBe("Cobbl");
+      expect(success.avoidedDuringRun).toEqual(["Pebbl", "Pebbly"]);
+    }
+  });
+
+  it("exhausts after 3 fails: emits suggest_exhausted with last attempt", async () => {
+    const llm = llmThatReturns(
+      similarCandidateJson("Pebbl"),       failScorecardJson("Pebbl", "domain"),
+      similarCandidateJson("Pebbly"),      failScorecardJson("Pebbly", "trademark"),
+      similarCandidateJson("Cobbl"),       failScorecardJson("Cobbl", "existingCompany"),
+    );
+    const events: WorkshopEvent[] = [];
+    await runSuggestSimilarPhase({
+      brief: "a meditation app",
+      rejectedName: "Pebble",
+      rejectedScorecard: { existingCompany: "pass", domain: "fail", trademark: "pass", connotations: "pass" },
+      rejectedFindings: [],
+      avoid: ["Pebble"],
+      getLlm: () => llm,
+      getSearch: () => search,
+      emit: (e) => events.push(e),
+    });
+
+    const exhausted = events.find((e) => e.type === "suggest_exhausted");
+    expect(exhausted).toBeDefined();
+    if (exhausted?.type === "suggest_exhausted") {
+      expect(exhausted.name).toBe("Cobbl");
+      expect(exhausted.avoidedDuringRun).toEqual(["Pebbl", "Pebbly"]);
+      expect(exhausted.scorecard.existingCompany).toBe("fail");
+    }
+    expect(events.find((e) => e.type === "suggest_success")).toBeUndefined();
   });
 });
