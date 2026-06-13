@@ -60,6 +60,12 @@ function targetAgent(event: WorkshopEvent): AgentName | null {
     case "workshop_started":
     case "brand_kit_ready":
       return null;
+    case "suggest_attempt_started":
+    case "suggest_attempt_named":
+    case "suggest_attempt_vetted":
+    case "suggest_success":
+    case "suggest_exhausted":
+      return null;
   }
 }
 
